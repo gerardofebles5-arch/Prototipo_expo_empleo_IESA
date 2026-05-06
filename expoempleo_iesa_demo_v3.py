@@ -1,8 +1,7 @@
 """
-EXPOEMPLEO IESA 2026 - PORTFOLIO TÉCNICO ELITE v3.0
+EXPOEMPLEO IESA 2026 - PORTFOLIO TÉCNICO ELITE v3.1 (FIXED)
 Autor: Salomon Febles / Gerardo Febles
 Perfil: Estudiante de Ingeniería de Sistemas - 9no Semestre
-Enfoque: Trading & Ciberseguridad & ML
 Evento: ExpoEmpleo IESA 2026
 NIVEL: ENTERPRISE-GRADE | PROFESSIONAL 2026
 """
@@ -20,7 +19,7 @@ import os
 import time
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
 import warnings
 warnings.filterwarnings('ignore')
@@ -34,7 +33,7 @@ st.set_page_config(
     menu_items={
         'Get Help': None,
         'Report a bug': None,
-        'About': "Portfolio Técnico Elite v3.0 | ExpoEmpleo IESA 2026"
+        'About': "Portfolio Técnico Elite v3.1 | ExpoEmpleo IESA 2026"
     }
 )
 
@@ -59,41 +58,88 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ================================================================================
-# BASE DE DATOS
+# BASE DE DATOS CORREGIDA
 # ================================================================================
 @st.cache_resource
 def init_database():
+    # check_same_thread=False es crucial para Streamlit
     conn = sqlite3.connect('expoempleo_demo_v3.db', check_same_thread=False)
     cursor = conn.cursor()
     
+    # 1. Tabla Inventory (11 columnas)
     cursor.execute('''CREATE TABLE IF NOT EXISTS inventory (
-        id INTEGER PRIMARY KEY, product_name TEXT, category TEXT, sku TEXT UNIQUE,
-        quantity INTEGER, min_stock INTEGER, unit_price REAL, cost_price REAL,
-        supplier TEXT, lead_time_days INTEGER, last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        product_name TEXT, 
+        category TEXT, 
+        sku TEXT UNIQUE,
+        quantity INTEGER, 
+        min_stock INTEGER, 
+        unit_price REAL, 
+        cost_price REAL,
+        supplier TEXT, 
+        lead_time_days INTEGER, 
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
 
+    # 2. Tabla Security Alerts (14 columnas)
     cursor.execute('''CREATE TABLE IF NOT EXISTS security_alerts (
-        id INTEGER PRIMARY KEY, alert_id TEXT UNIQUE, severity TEXT, category TEXT,
-        threat_type TEXT, source_ip TEXT, target_system TEXT, mitre_tactic TEXT,
-        mitre_technique TEXT, command_detected TEXT, description TEXT,
-        status TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        alert_id TEXT UNIQUE, 
+        severity TEXT, 
+        category TEXT,
+        threat_type TEXT, 
+        source_ip TEXT, 
+        target_system TEXT, 
+        mitre_tactic TEXT,
+        mitre_technique TEXT, 
+        command_detected TEXT, 
+        description TEXT,
+        status TEXT, 
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
 
+    # 3. Tabla Documents (12 columnas)
     cursor.execute('''CREATE TABLE IF NOT EXISTS documents (
-        id INTEGER PRIMARY KEY, document_id TEXT UNIQUE, file_name TEXT,
-        file_type TEXT, file_size INTEGER, hash_sha256 TEXT UNIQUE, hash_md5 TEXT,
-        uploaded_by TEXT, signatures_required INTEGER, signatures_received INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status TEXT DEFAULT 'pending')''')
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        document_id TEXT UNIQUE, 
+        file_name TEXT,
+        file_type TEXT, 
+        file_size INTEGER, 
+        hash_sha256 TEXT UNIQUE, 
+        hash_md5 TEXT,
+        uploaded_by TEXT, 
+        signatures_required INTEGER, 
+        signatures_received INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+        status TEXT DEFAULT 'pending')''')
 
+    # 4. Tabla Audit (6 columnas)
     cursor.execute('''CREATE TABLE IF NOT EXISTS document_audit (
-        id INTEGER PRIMARY KEY, document_id TEXT, action TEXT, performed_by TEXT,
-        ip_address TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        document_id TEXT, 
+        action TEXT, 
+        performed_by TEXT,
+        ip_address TEXT, 
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
 
+    # 5. Tabla Trades (14 columnas)
     cursor.execute('''CREATE TABLE IF NOT EXISTS trades (
-        id INTEGER PRIMARY KEY, trade_id TEXT UNIQUE, symbol TEXT, side TEXT,
-        entry_price REAL, exit_price REAL, quantity INTEGER, stop_loss REAL,
-        take_profit REAL, pnl REAL, status TEXT, opened_at TIMESTAMP,
-        closed_at TIMESTAMP, strategy TEXT)''')
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        trade_id TEXT UNIQUE, 
+        symbol TEXT, 
+        side TEXT,
+        entry_price REAL, 
+        exit_price REAL, 
+        quantity INTEGER, 
+        stop_loss REAL,
+        take_profit REAL, 
+        pnl REAL, 
+        status TEXT, 
+        opened_at TIMESTAMP,
+        closed_at TIMESTAMP, 
+        strategy TEXT)''')
 
-    # Datos demo
+    # --- DATOS DEMO ---
+    
+    # Insertar Inventario (10 valores + ID autoincremental)
     cursor.execute("SELECT COUNT(*) FROM inventory")
     if cursor.fetchone()[0] == 0:
         products = [
@@ -106,9 +152,12 @@ def init_database():
             ('Atorvastatina 20mg', 'Cardiología', 'CAR-001', 120, 45, 18.50, 11.30, 'Pfizer Venezuela', 14),
             ('Aspirina 100mg', 'Cardiología', 'CAR-002', 300, 100, 3.25, 1.90, 'Bayer Venezuela', 5),
         ]
-        cursor.executemany('INSERT INTO inventory VALUES (NULL,?,?,?,?,?,?,?,?,?,?)', 
-                          [(None,)+p+(datetime.now(),) for p in products])
+        # INSERTA 10 VALORES (La columna ID es AUTOINCREMENT y last_updated tiene DEFAULT)
+        cursor.executemany('''INSERT INTO inventory 
+            (product_name, category, sku, quantity, min_stock, unit_price, cost_price, supplier, lead_time_days) 
+            VALUES (?,?,?,?,?,?,?,?,?)''', products)
 
+    # Insertar Alertas (13 valores + ID autoincremental)
     cursor.execute("SELECT COUNT(*) FROM security_alerts")
     if cursor.fetchone()[0] == 0:
         alerts = [
@@ -116,14 +165,17 @@ def init_database():
             ('ALT-002', 'HIGH', 'Data Theft', 'Exfiltration', '192.168.1.105', 'FILE-01', 'Collection', 'T1005', 'robocopy /MIR', 'Data exfil', 'investigating'),
             ('ALT-003', 'CRITICAL', 'Ransomware', 'Shadow Delete', '192.168.1.110', 'WS-02', 'Impact', 'T1490', 'vssadmin delete', 'Backup deletion', 'blocked'),
         ]
-        cursor.executemany('INSERT INTO security_alerts VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?)',
-                          [(None,)+a+(datetime.now(),) for a in alerts])
+        cursor.executemany('''INSERT INTO security_alerts 
+            (alert_id, severity, category, threat_type, source_ip, target_system, mitre_tactic, mitre_technique, command_detected, description, status) 
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)''', alerts)
 
     conn.commit()
     return conn
 
 db_conn = init_database()
-def get_db(): return sqlite3.connect('expoempleo_demo_v3.db', check_same_thread=False)
+
+def get_db(): 
+    return sqlite3.connect('expoempleo_demo_v3.db', check_same_thread=False)
 
 # ================================================================================
 # FUNCIONES UTILITARIAS
@@ -206,13 +258,13 @@ with st.sidebar:
         label_visibility="collapsed"
     )
     st.markdown("---")
-    st.caption("v3.0 Elite | ExpoEmpleo IESA 2026")
+    st.caption("v3.1 Fixed | ExpoEmpleo IESA 2026")
 
 # ================================================================================
 # DASHBOARD
 # ================================================================================
 if selected == "🏠 Dashboard":
-    st.markdown('<h1 class="main-header">Portfolio Técnico Elite v3.0</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">Portfolio Técnico Elite v3.1</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Salomon Febles | ExpoEmpleo IESA 2026 | Est. Ing. Sistemas + Trading + Ciberseguridad + ML</p>', unsafe_allow_html=True)
     
     cols = st.columns(5)
@@ -259,7 +311,7 @@ if selected == "🏠 Dashboard":
     empresas = ["Selecciona...", "Intelix", "Netconsult", "Banesco", "Mercantil", "PwC", "Deloitte", "EY", "KPMG", "HLB", "Farmatodo"]
     empresa = st.selectbox("Empresa", empresas)
 
-    if empresa != "Seleccionar...":
+    if empresa != "Selecciona...":
         recs = {
             "Intelix": ("🛡️ ShieldVZLA Elite", "MITRE ATT&CK + Detección Lotus Wiper"),
             "Banesco": ("📈 TradeGuard Elite", "Trading Algorítmico + Risk Management"),
@@ -523,7 +575,8 @@ elif selected == "🤖 FinRisk AI Elite":
     score = (df_ml['monthly_income'] * 0.3 - df_ml['existing_debt'] * 0.001 + df_ml['credit_history'] * 5 + 
              df_ml['employment_years'] * 50 - df_ml['missed_payments'] * 200 - df_ml['credit_utilization'] * 200)
     df_ml['risk_score'] = score
-    df_ml['risk_label'] = pd.cut(score, bins=[-np.inf, 400, 700, np.inf], labels=[2, 1, 0]).astype(int) # 2=High, 1=Med, 0=Low
+    # Mapeo a enteros para evitar errores de tipo en sklearn
+    df_ml['risk_label'] = pd.cut(score, bins=[-np.inf, 400, 700, np.inf], labels=[2, 1, 0]).astype(int)
 
     tabs = st.tabs(["🎯 Predicción", "📊 Feature Importance", "📈 Model Performance", "🔍 Explainable AI"])
 
@@ -676,8 +729,8 @@ elif selected == "📄 DocuVerify Elite":
                     md5 = calc_hash_md5(file_bytes)
                     doc_id = gen_id("DOC")
                     conn = get_db(); cur = conn.cursor()
-                    cur.execute("INSERT INTO documents VALUES (NULL,?,?,?,?,?,?,?,?,?,?)", (doc_id, doc_name, uploaded.type, len(file_bytes), sha, md5, "admin", sig_required, 0, datetime.now(), 'pending'))
-                    cur.execute("INSERT INTO document_audit VALUES (NULL,?,?,?,?,?)", (doc_id, "REGISTERED", "admin", "192.168.1.100", datetime.now()))
+                    cur.execute("INSERT INTO documents (document_id, file_name, file_type, file_size, hash_sha256, hash_md5, uploaded_by, signatures_required, signatures_received, status) VALUES (?,?,?,?,?,?,?,?,?,?)", (doc_id, doc_name, uploaded.type, len(file_bytes), sha, md5, "admin", sig_required, 0, 'pending'))
+                    cur.execute("INSERT INTO document_audit (document_id, action, performed_by, ip_address) VALUES (?,?,?,?)", (doc_id, "REGISTERED", "admin", "192.168.1.100"))
                     conn.commit(); conn.close()
                     st.success(f"✅ Registrado: {doc_id}")
                     st.code(f"SHA256: {sha}")
@@ -704,7 +757,7 @@ elif selected == "📄 DocuVerify Elite":
                 req = df_pending[df_pending['document_id']==doc_to_sign].iloc[0]['signatures_required']
                 status = 'verified' if new_count >= req else 'pending'
                 cur.execute("UPDATE documents SET signatures_received=?, status=? WHERE document_id=?", (new_count, status, doc_to_sign))
-                cur.execute("INSERT INTO document_audit VALUES (NULL,?,?,?,?,?)", (doc_to_sign, "SIGNED", signer_name, "192.168.1.100", datetime.now()))
+                cur.execute("INSERT INTO document_audit (document_id, action, performed_by, ip_address) VALUES (?,?,?,?)", (doc_to_sign, "SIGNED", signer_name, "192.168.1.100"))
                 conn.commit(); conn.close()
                 st.success(f"✅ Verificado!" if status=='verified' else f"✍️ Registrada. Faltan {req - new_count}.")
                 if status=='verified': st.balloons()
@@ -736,7 +789,7 @@ elif selected == "📄 DocuVerify Elite":
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; padding: 20px; color: #64748b;'>
- <p><strong>ExpoEmpleo IESA 2026</strong> | Portfolio Técnico Elite v3.0</p>
+ <p><strong>ExpoEmpleo IESA 2026</strong> | Portfolio Técnico Elite v3.1</p>
  <p style='font-size: 0.85rem;'>Salomon Febles | Estudiante de Ingeniería de Sistemas - 9no Semestre</p>
  <p style='font-size: 0.8rem;'>Python | Streamlit | SQLite | Plotly | Scikit-learn | MITRE ATT&CK</p>
 </div>
